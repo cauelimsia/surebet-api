@@ -32,11 +32,11 @@ describe('computeArbs', () => {
   });
 
   it('detecta arb 3-way em h2h de futebol', () => {
-    const soccer = { sportKey: 'soccer_epl', market: 'h2h' };
+    const soccer = { sportKey: 'soccer_epl', market: 'h2h', homeTeam: 'Arsenal', awayTeam: 'Chelsea' };
     const odds = [
-      makeOdd({ ...soccer, outcome: 'Home', price: 3.9, bookmaker: 'bookA' }),
+      makeOdd({ ...soccer, outcome: 'Arsenal', price: 3.9, bookmaker: 'bookA' }),
       makeOdd({ ...soccer, outcome: 'Draw', price: 4.0, bookmaker: 'bookB' }),
-      makeOdd({ ...soccer, outcome: 'Away', price: 2.2, bookmaker: 'bookC' }),
+      makeOdd({ ...soccer, outcome: 'Chelsea', price: 2.2, bookmaker: 'bookC' }),
     ];
     const arbs = computeArbs(odds);
     expect(arbs).toHaveLength(1);
@@ -74,10 +74,10 @@ describe('computeArbs', () => {
   });
 
   it('descarta h2h de futebol sem o empate cotado (falso 2-way)', () => {
-    const soccer = { sportKey: 'soccer_epl', market: 'h2h' };
+    const soccer = { sportKey: 'soccer_epl', market: 'h2h', homeTeam: 'Arsenal', awayTeam: 'Chelsea' };
     const odds = [
-      makeOdd({ ...soccer, outcome: 'Home', price: 2.2, bookmaker: 'bookA' }),
-      makeOdd({ ...soccer, outcome: 'Away', price: 2.2, bookmaker: 'bookB' }),
+      makeOdd({ ...soccer, outcome: 'Arsenal', price: 2.2, bookmaker: 'bookA' }),
+      makeOdd({ ...soccer, outcome: 'Chelsea', price: 2.2, bookmaker: 'bookB' }),
     ];
     expect(computeArbs(odds)).toHaveLength(0);
   });
@@ -109,6 +109,38 @@ describe('computeArbs', () => {
     const odds = [
       makeOdd({ eventId: 'ev1', market: 'totals', outcome: 'Over', point: 2.5, price: 2.1, bookmaker: 'bookA' }),
       makeOdd({ eventId: 'ev2', market: 'totals', outcome: 'Under', point: 2.5, price: 2.1, bookmaker: 'bookB' }),
+    ];
+    expect(computeArbs(odds)).toHaveLength(0);
+  });
+
+  it('rejeita outcome fora do vocabulário do mercado (label sujo)', () => {
+    const odds = [
+      makeOdd({ market: 'totals', outcome: 'Over', point: 2.5, price: 2.1, bookmaker: 'bookA' }),
+      makeOdd({ market: 'totals', outcome: 'Under', point: 2.5, price: 2.1, bookmaker: 'bookB' }),
+      makeOdd({ market: 'totals', outcome: 'Over ', point: 2.5, price: 9.9, bookmaker: 'bookC' }),
+    ];
+    const arbs = computeArbs(odds);
+    expect(arbs).toHaveLength(1);
+    expect(arbs[0].legs).toHaveLength(2);
+    for (const leg of arbs[0].legs) {
+      expect(leg.price).toBe(2.1);
+    }
+  });
+
+  it('detecta arb 2-way em h2h de basquete', () => {
+    const odds = [
+      makeOdd({ outcome: 'Lakers', price: 2.1, bookmaker: 'bookA' }),
+      makeOdd({ outcome: 'Celtics', price: 2.1, bookmaker: 'bookB' }),
+    ];
+    const arbs = computeArbs(odds);
+    expect(arbs).toHaveLength(1);
+    expect(arbs[0].profitPct).toBeCloseTo(5.0, 4);
+  });
+
+  it('rejeita h2h com outcome que não é nenhum dos times', () => {
+    const odds = [
+      makeOdd({ outcome: 'Lakers', price: 2.1, bookmaker: 'bookA' }),
+      makeOdd({ outcome: 'Warriors', price: 2.1, bookmaker: 'bookB' }),
     ];
     expect(computeArbs(odds)).toHaveLength(0);
   });

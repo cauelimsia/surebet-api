@@ -21,20 +21,26 @@ export function computeArbs(odds: NormalizedOdd[]): Arb[] {
   return arbs;
 }
 
-function detectArb(arbKey: string, group: NormalizedOdd[]): Arb | null {
-  // o conjunto esperado de resultados vem da casa que cota o mercado mais completo
-  // (a visão de mercado completo é a união de todos os outcomes que vemos)
-  const expected = new Set<string>();
-  for (const odd of group) {
-    expected.add(odd.outcome);
+function expectedOutcomes(first: NormalizedOdd): Set<string> | null {
+  switch (first.market) {
+    case 'totals':
+      return new Set(['Over', 'Under']);
+    case 'spreads':
+      return new Set([first.homeTeam, first.awayTeam]);
+    case 'h2h':
+      return first.sportKey.startsWith('soccer')
+        ? new Set([first.homeTeam, first.awayTeam, 'Draw'])
+        : new Set([first.homeTeam, first.awayTeam]);
+    default:
+      // mercado sem forma conhecida: não arrisca arb falso
+      return null;
   }
-  if (expected.size < 2) return null;
+}
 
+function detectArb(arbKey: string, group: NormalizedOdd[]): Arb | null {
   const first = group[0];
-  // h2h de futebol é 3-way; sem o empate cotado a conta fecharia um falso arb
-  if (first.market === 'h2h' && first.sportKey.startsWith('soccer') && expected.size < 3) {
-    return null;
-  }
+  const expected = expectedOutcomes(first);
+  if (!expected) return null;
 
   const best = new Map<string, ArbLeg>();
   for (const odd of group) {
