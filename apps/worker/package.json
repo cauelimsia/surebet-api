@@ -14,6 +14,7 @@
     "@surebet/core": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "^26.1.1",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"

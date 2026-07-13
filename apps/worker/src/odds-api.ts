@@ -32,6 +32,12 @@ export interface FetchOddsResult {
   requestsUsed: number | null;
 }
 
+function parseQuotaHeader(raw: string | null): number | null {
+  if (raw === null) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
 export async function fetchOdds(
   sportKey: string,
   apiKey: string,
@@ -52,7 +58,7 @@ export async function fetchOdds(
   const used = res.headers.get('x-requests-used');
   return {
     events,
-    requestsRemaining: remaining === null ? null : Number(remaining),
-    requestsUsed: used === null ? null : Number(used),
+    requestsRemaining: parseQuotaHeader(remaining),
+    requestsUsed: parseQuotaHeader(used),
   };
 }

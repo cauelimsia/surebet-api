@@ -10,6 +10,15 @@ export interface WorkerConfig {
   runOnce: boolean;
 }
 
+const positiveNumber = (name: string, raw: string | undefined, fallback: number): number => {
+  if (raw === undefined || raw === '') return fallback;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`variável de ambiente ${name} inválida: "${raw}" (esperado número positivo)`);
+  }
+  return value;
+};
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): WorkerConfig {
   const required = (name: string): string => {
     const value = env[name];
@@ -24,8 +33,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WorkerConfig {
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
-    pollIntervalSeconds: Number(env.POLL_INTERVAL_SECONDS ?? 60),
-    monthlyQuota: Number(env.MONTHLY_QUOTA ?? 500),
+    pollIntervalSeconds: positiveNumber('POLL_INTERVAL_SECONDS', env.POLL_INTERVAL_SECONDS, 60),
+    monthlyQuota: positiveNumber('MONTHLY_QUOTA', env.MONTHLY_QUOTA, 500),
     telegramBotToken: env.TELEGRAM_BOT_TOKEN,
     telegramChatId: env.TELEGRAM_CHAT_ID,
     runOnce: env.RUN_ONCE === '1',

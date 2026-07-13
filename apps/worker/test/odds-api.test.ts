@@ -29,4 +29,18 @@ describe('fetchOdds', () => {
       new Response('Invalid API key', { status: 401 })) as typeof fetch;
     await expect(fetchOdds('soccer_epl', 'bad', fakeFetch)).rejects.toThrow('401');
   });
+
+  it('header malformado ("x-requests-remaining": "abc") resulta em requestsRemaining null', async () => {
+    const fakeFetch = (async (url: RequestInfo | URL) => {
+      return new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { 'x-requests-remaining': 'abc', 'x-requests-used': '50' },
+      });
+    }) as typeof fetch;
+
+    const result = await fetchOdds('soccer_epl', 'test-key', fakeFetch);
+
+    expect(result.requestsRemaining).toBeNull();
+    expect(result.requestsUsed).toBe(50);
+  });
 });
