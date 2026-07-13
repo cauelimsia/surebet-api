@@ -16,6 +16,8 @@ export async function upsertEventsAndOdds(
   db: SupabaseClient,
   odds: NormalizedOdd[],
 ): Promise<void> {
+  if (odds.length === 0) return;
+
   const events = new Map<string, Record<string, unknown>>();
   for (const odd of odds) {
     events.set(odd.eventId, {
@@ -57,6 +59,7 @@ export async function getActiveArbRefs(
 
 export async function applyArbSync(db: SupabaseClient, plan: ArbSyncPlan): Promise<void> {
   const nowIso = new Date().toISOString();
+  const errors: string[] = [];
 
   if (plan.inserts.length > 0) {
     const rows = plan.inserts.map((arb) => ({
@@ -69,7 +72,7 @@ export async function applyArbSync(db: SupabaseClient, plan: ArbSyncPlan): Promi
       status: 'active',
     }));
     const { error } = await db.from('arbs').insert(rows);
-    if (error) throw new Error(`insert arbs: ${error.message}`);
+    if (error) errors.push(`insert arbs: ${error.message}`);
   }
 
   for (const { id, arb } of plan.updates) {
@@ -77,7 +80,7 @@ export async function applyArbSync(db: SupabaseClient, plan: ArbSyncPlan): Promi
       .from('arbs')
       .update({ profit_pct: arb.profitPct, legs: arb.legs, updated_at: nowIso })
       .eq('id', id);
-    if (error) throw new Error(`update arb ${id}: ${error.message}`);
+    if (error) errors.push(`update arb ${id}: ${error.message}`);
   }
 
   if (plan.goneIds.length > 0) {
@@ -85,6 +88,8 @@ export async function applyArbSync(db: SupabaseClient, plan: ArbSyncPlan): Promi
       .from('arbs')
       .update({ status: 'gone', gone_at: nowIso, updated_at: nowIso })
       .in('id', plan.goneIds);
-    if (error) throw new Error(`mark gone: ${error.message}`);
+    if (error) errors.push(`mark gone: ${error.message}`);
   }
+
+  if (errors.length > 0) throw new Error(`applyArbSync: ${errors.join('; ')}`);
 }
