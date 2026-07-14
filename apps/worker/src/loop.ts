@@ -1,5 +1,6 @@
 import { computeArbs } from '@surebet/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { sendTelegramAlert } from './alert.js';
 import { planArbSync } from './arb-sync.js';
 import type { WorkerConfig } from './config.js';
 import { applyArbSync, getActiveArbRefs, upsertEventsAndOdds } from './db.js';
@@ -28,25 +29,46 @@ export async function withRetry<T>(
 export interface CycleResult {
   failed: number;
   requestsRemaining: number | null;
+  requestsUsed: number | null;
+}
+
+export interface CycleDeps {
+  fetchOdds: typeof fetchOdds;
+  normalizeEvents: typeof normalizeEvents;
+  computeArbs: typeof computeArbs;
+  sendTelegramAlert: typeof sendTelegramAlert;
+  sleep: (ms: number) => Promise<void>;
 }
 
 export async function runCycle(
   db: SupabaseClient,
   config: WorkerConfig,
+  deps: Partial<CycleDeps> = {},
 ): Promise<CycleResult> {
+  const d: CycleDeps = {
+    fetchOdds,
+    normalizeEvents,
+    computeArbs,
+    sendTelegramAlert,
+    sleep: defaultSleep,
+    ...deps,
+  };
+
   let failed = 0;
   let requestsRemaining: number | null = null;
+  let requestsUsed: number | null = null;
 
   for (const sport of config.sports) {
     const started = Date.now();
     try {
-      const result = await withRetry(() => fetchOdds(sport, config.oddsApiKey), 3);
+      const result = await withRetry(() => d.fetchOdds(sport, config.oddsApiKey), 3, d.sleep);
       requestsRemaining = result.requestsRemaining ?? requestsRemaining;
+      requestsUsed = result.requestsUsed ?? requestsUsed;
 
-      const odds = normalizeEvents(result.events);
+      const odds = d.normalizeEvents(result.events);
       if (odds.length > 0) await upsertEventsAndOdds(db, odds);
 
-      const arbs = computeArbs(odds);
+      const arbs = d.computeArbs(odds);
       const active = await getActiveArbRefs(db, sport);
       const plan = planArbSync(arbs, active);
       await applyArbSync(db, plan);
@@ -55,7 +77,7 @@ export async function runCycle(
         level: 'info', sport,
         events: result.events.length, oddsRows: odds.length,
         arbs: arbs.length, novos: plan.inserts.length, gone: plan.goneIds.length,
-        requestsRemaining, ms: Date.now() - started,
+        requestsRemaining, requestsUsed, ms: Date.now() - started,
       }));
     } catch (err) {
       failed++;
@@ -64,5 +86,5 @@ export async function runCycle(
       }));
     }
   }
-  return { failed, requestsRemaining };
+  return { failed, requestsRemaining, requestsUsed };
 }
