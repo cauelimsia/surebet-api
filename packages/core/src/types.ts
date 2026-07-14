@@ -16,6 +16,7 @@ export interface ArbLeg {
   bookmaker: string;
   outcome: string;
   price: number;
+  point: number;
 }
 
 export interface Arb {

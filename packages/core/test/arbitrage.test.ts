@@ -29,6 +29,9 @@ describe('computeArbs', () => {
     expect(arbs[0].profitPct).toBeCloseTo(5.0, 4);
     expect(arbs[0].arbKey).toBe('ev1|totals|210.5');
     expect(arbs[0].legs).toHaveLength(2);
+    for (const leg of arbs[0].legs) {
+      expect(leg.point).toBe(210.5);
+    }
   });
 
   it('detecta arb 3-way em h2h de futebol', () => {
@@ -82,14 +85,58 @@ describe('computeArbs', () => {
     expect(computeArbs(odds)).toHaveLength(0);
   });
 
-  it('agrupa spreads pelo valor absoluto do point (linhas espelhadas)', () => {
+  it('agrupa spreads por linha assinada relativa ao mandante (linhas complementares)', () => {
     const odds = [
       makeOdd({ market: 'spreads', outcome: 'Lakers', point: -1.5, price: 2.05, bookmaker: 'bookA' }),
       makeOdd({ market: 'spreads', outcome: 'Celtics', point: 1.5, price: 2.05, bookmaker: 'bookB' }),
     ];
     const arbs = computeArbs(odds);
     expect(arbs).toHaveLength(1);
-    expect(arbs[0].arbKey).toBe('ev1|spreads|1.5');
+    expect(arbs[0].arbKey).toBe('ev1|spreads|-1.5');
+  });
+
+  it('NÃO reporta arb quando as duas casas cotam o mesmo favorito na mesma linha (regressão do bug de |point|)', () => {
+    // Lakers -2.5 na bookA e Celtics -2.5 na bookB: favoritos opostos, mesmo
+    // valor absoluto de linha. Math.abs(point) juntava as duas na mesma
+    // chave e emitia um "arb" que perde as duas pernas se Lakers vencer por 1-2.
+    const odds = [
+      makeOdd({ market: 'spreads', outcome: 'Lakers', point: -2.5, price: 2.05, bookmaker: 'bookA' }),
+      makeOdd({ market: 'spreads', outcome: 'Celtics', point: -2.5, price: 2.05, bookmaker: 'bookB' }),
+    ];
+    expect(computeArbs(odds)).toHaveLength(0);
+  });
+
+  it('detecta arb válido de spreads complementar e expõe o point assinado de cada leg', () => {
+    const odds = [
+      makeOdd({ market: 'spreads', outcome: 'Lakers', point: -2.5, price: 2.1, bookmaker: 'bookA' }),
+      makeOdd({ market: 'spreads', outcome: 'Celtics', point: 2.5, price: 2.1, bookmaker: 'bookB' }),
+    ];
+    const arbs = computeArbs(odds);
+    expect(arbs).toHaveLength(1);
+    expect(arbs[0].arbKey).toBe('ev1|spreads|-2.5');
+
+    const lakersLeg = arbs[0].legs.find((l) => l.outcome === 'Lakers');
+    const celticsLeg = arbs[0].legs.find((l) => l.outcome === 'Celtics');
+    expect(lakersLeg?.point).toBe(-2.5);
+    expect(celticsLeg?.point).toBe(2.5);
+  });
+
+  it('point da leg reflete a linha do próprio mercado (totals = linha, h2h = 0)', () => {
+    const totalsOdds = [
+      makeOdd({ market: 'totals', outcome: 'Over', point: 5.5, price: 2.05, bookmaker: 'bookA' }),
+      makeOdd({ market: 'totals', outcome: 'Under', point: 5.5, price: 2.05, bookmaker: 'bookB' }),
+    ];
+    const totalsArbs = computeArbs(totalsOdds);
+    expect(totalsArbs).toHaveLength(1);
+    expect(totalsArbs[0].legs.every((l) => l.point === 5.5)).toBe(true);
+
+    const h2hOdds = [
+      makeOdd({ market: 'h2h', outcome: 'Lakers', price: 2.05, bookmaker: 'bookA' }),
+      makeOdd({ market: 'h2h', outcome: 'Celtics', price: 2.05, bookmaker: 'bookB' }),
+    ];
+    const h2hArbs = computeArbs(h2hOdds);
+    expect(h2hArbs).toHaveLength(1);
+    expect(h2hArbs[0].legs.every((l) => l.point === 0)).toBe(true);
   });
 
   it('não mistura linhas diferentes de totals', () => {
@@ -135,6 +182,9 @@ describe('computeArbs', () => {
     const arbs = computeArbs(odds);
     expect(arbs).toHaveLength(1);
     expect(arbs[0].profitPct).toBeCloseTo(5.0, 4);
+    for (const leg of arbs[0].legs) {
+      expect(leg.point).toBe(0);
+    }
   });
 
   it('rejeita h2h com outcome que não é nenhum dos times', () => {

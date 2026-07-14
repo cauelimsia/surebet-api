@@ -1,6 +1,5 @@
 import { computeArbs } from '@surebet/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { sendTelegramAlert } from './alert.js';
 import { planArbSync } from './arb-sync.js';
 import type { WorkerConfig } from './config.js';
 import { applyArbSync, getActiveArbRefs, upsertEventsAndOdds } from './db.js';
@@ -36,7 +35,6 @@ export interface CycleDeps {
   fetchOdds: typeof fetchOdds;
   normalizeEvents: typeof normalizeEvents;
   computeArbs: typeof computeArbs;
-  sendTelegramAlert: typeof sendTelegramAlert;
   sleep: (ms: number) => Promise<void>;
 }
 
@@ -49,7 +47,6 @@ export async function runCycle(
     fetchOdds,
     normalizeEvents,
     computeArbs,
-    sendTelegramAlert,
     sleep: defaultSleep,
     ...deps,
   };

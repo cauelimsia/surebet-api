@@ -10,8 +10,8 @@ function makeArb(arbKey: string): Arb {
     point: 2.5,
     profitPct: 3.5,
     legs: [
-      { bookmaker: 'bookA', outcome: 'Over', price: 2.1 },
-      { bookmaker: 'bookB', outcome: 'Under', price: 2.1 },
+      { bookmaker: 'bookA', outcome: 'Over', price: 2.1, point: 2.5 },
+      { bookmaker: 'bookB', outcome: 'Under', price: 2.1, point: 2.5 },
     ],
   };
 }

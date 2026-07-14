@@ -1,13 +1,23 @@
 import type { Arb, ArbLeg, NormalizedOdd } from './types.js';
 
-function lineKey(market: string, point: number): number {
-  return market === 'spreads' ? Math.abs(point) : point;
+function lineKey(odd: Pick<NormalizedOdd, 'market' | 'point' | 'outcome' | 'homeTeam'>): number {
+  switch (odd.market) {
+    case 'spreads':
+      // linha assinada relativa ao mandante: só linhas complementares (favorito
+      // e azarão do mesmo confronto) caem no mesmo grupo. Usar |point| juntava
+      // "Lakers -2.5" com "Celtics -2.5" (favoritos opostos) na mesma chave.
+      return odd.outcome === odd.homeTeam ? odd.point : -odd.point;
+    case 'totals':
+      return odd.point;
+    default:
+      return 0;
+  }
 }
 
 export function computeArbs(odds: NormalizedOdd[]): Arb[] {
   const groups = new Map<string, NormalizedOdd[]>();
   for (const odd of odds) {
-    const key = `${odd.eventId}|${odd.market}|${lineKey(odd.market, odd.point)}`;
+    const key = `${odd.eventId}|${odd.market}|${lineKey(odd)}`;
     const list = groups.get(key) ?? [];
     list.push(odd);
     groups.set(key, list);
@@ -47,7 +57,12 @@ function detectArb(arbKey: string, group: NormalizedOdd[]): Arb | null {
     if (!expected.has(odd.outcome)) continue;
     const current = best.get(odd.outcome);
     if (!current || odd.price > current.price) {
-      best.set(odd.outcome, { bookmaker: odd.bookmaker, outcome: odd.outcome, price: odd.price });
+      best.set(odd.outcome, {
+        bookmaker: odd.bookmaker,
+        outcome: odd.outcome,
+        price: odd.price,
+        point: odd.point,
+      });
     }
   }
   if (best.size !== expected.size) return null;
@@ -62,7 +77,7 @@ function detectArb(arbKey: string, group: NormalizedOdd[]): Arb | null {
     arbKey,
     eventId: first.eventId,
     market: first.market,
-    point: lineKey(first.market, first.point),
+    point: lineKey(first),
     profitPct: Math.round((1 / sum - 1) * 100 * 10000) / 10000,
     legs,
   };
