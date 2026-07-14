@@ -20,7 +20,9 @@ Scanner de arbitragem esportiva (surebets) pre-match. Spec completo em
 
 1. `pnpm install && pnpm build`
 2. `cd apps/worker && pm2 start ecosystem.config.cjs`
-3. Env vars via `.env` no diretório do worker (pm2 herda) ou `pm2 set`
+3. `.env` em `apps/worker/` é carregado pelo próprio app no boot (via
+   `process.loadEnvFile`) — funciona tanto com `pnpm dev` quanto com pm2,
+   já que ambos rodam com cwd em `apps/worker`. Alternativa: `pm2 set`
 
 ## Testes
 

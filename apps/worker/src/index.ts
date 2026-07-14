@@ -1,3 +1,9 @@
+try {
+  process.loadEnvFile();
+} catch {
+  // .env opcional — produção pode injetar env vars direto
+}
+
 import { sendTelegramAlert } from './alert.js';
 import { loadConfig } from './config.js';
 import { createDb, upsertSports } from './db.js';
