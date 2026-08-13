@@ -79,19 +79,27 @@ um par complementar — caíam na mesma chave e produziam arbitragem fantasma.
 
 ## 🏗️ Arquitetura
 
-```
-The Odds API
-     │
-     ▼
-apps/worker ──► normalize.ts   traduz o payload do provedor no modelo interno
-     │          loop.ts        ciclo de coleta (RUN_ONCE para um único passe)
-     │          arb-sync.ts    reconcilia a tabela `arbs`: abre, atualiza e fecha
-     │          alert.ts       notificação das novas
-     ▼
-packages/core ──► computeArbs()   motor puro, sem I/O
-     │
-     ▼
-Supabase Postgres ──► sports · events · odds · arbs
+```mermaid
+flowchart TD
+    API["The Odds API"]
+
+    subgraph worker["apps/worker"]
+        direction TB
+        N["normalize.ts<br/><i>payload do provedor no modelo interno</i>"]
+        L["loop.ts<br/><i>ciclo de coleta · RUN_ONCE faz um passe só</i>"]
+        S["arb-sync.ts<br/><i>reconcilia: abre, atualiza e fecha</i>"]
+        AL["alert.ts<br/><i>notifica as novas</i>"]
+    end
+
+    subgraph core["packages/core"]
+        C["computeArbs()<br/><i>motor puro, sem I/O</i>"]
+    end
+
+    DB[("Supabase Postgres<br/>sports · events · odds · arbs")]
+
+    API --> N --> L --> C --> S --> DB
+    S --> AL
+    DB -. estado aberto .-> S
 ```
 
 O `arb-sync` é **reconciliador, não append-only**: a cada ciclo ele compara o que o motor
