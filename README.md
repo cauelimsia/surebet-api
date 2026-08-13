@@ -4,12 +4,12 @@
 
 **Scanner de arbitragem esportiva pre-match — motor puro, worker de coleta e Postgres**
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](#)
-[![Node.js](https://img.shields.io/badge/Node.js-5FA04E?style=for-the-badge&logo=nodedotjs&logoColor=white)](#)
-[![pnpm](https://img.shields.io/badge/pnpm_workspace-F69220?style=for-the-badge&logo=pnpm&logoColor=white)](#)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](#)
-[![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white)](#)
-[![Vitest](https://img.shields.io/badge/Vitest-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](#)
+<a href="#"><img height="34" src="https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white" alt="TypeScript"></a>
+<a href="#"><img height="34" src="https://img.shields.io/badge/Node.js-5FA04E?style=flat&logo=nodedotjs&logoColor=white" alt="Node.js"></a>
+<a href="#"><img height="34" src="https://img.shields.io/badge/pnpm_workspace-F69220?style=flat&logo=pnpm&logoColor=white" alt="pnpm"></a>
+<a href="#"><img height="34" src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat&logo=postgresql&logoColor=white" alt="PostgreSQL"></a>
+<a href="#"><img height="34" src="https://img.shields.io/badge/Supabase-3FCF8E?style=flat&logo=supabase&logoColor=white" alt="Supabase"></a>
+<a href="#"><img height="34" src="https://img.shields.io/badge/Vitest-6E9F18?style=flat&logo=vitest&logoColor=white" alt="Vitest"></a>
 
 [Como detecta](#-como-a-detecção-funciona) · [A parte difícil](#-a-parte-difícil-agrupar-a-linha-certa) · [Arquitetura](#️-arquitetura) · [Rodar local](#-rodar-local)
 
