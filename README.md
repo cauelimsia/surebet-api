@@ -1,29 +1,154 @@
-# surebet-api
+<div align="center">
 
-Scanner de arbitragem esportiva (surebets) pre-match. Spec completo em
-`docs/superpowers/specs/2026-07-13-surebet-api-design.md`.
+# 📈 surebet-api
 
-## Estrutura
+**Scanner de arbitragem esportiva pre-match — motor puro, worker de coleta e Postgres**
 
-- `packages/core` — motor de arbitragem puro (computeArbs)
-- `apps/worker` — coleta odds no The Odds API e mantém a tabela `arbs` no Supabase
-- `supabase/migrations` — schema do banco
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](#)
+[![Node.js](https://img.shields.io/badge/Node.js-5FA04E?style=for-the-badge&logo=nodedotjs&logoColor=white)](#)
+[![pnpm](https://img.shields.io/badge/pnpm_workspace-F69220?style=for-the-badge&logo=pnpm&logoColor=white)](#)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](#)
+[![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white)](#)
+[![Vitest](https://img.shields.io/badge/Vitest-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](#)
 
-## Rodar o worker localmente
+[Como detecta](#-como-a-detecção-funciona) · [A parte difícil](#-a-parte-difícil-agrupar-a-linha-certa) · [Arquitetura](#️-arquitetura) · [Rodar local](#-rodar-local)
 
-1. `pnpm install && pnpm build`
-2. Copie `apps/worker/.env.example` pra `apps/worker/.env` e preencha
-3. Teste um ciclo único: `RUN_ONCE=1 pnpm --filter @surebet/worker dev`
-   (no PowerShell: `$env:RUN_ONCE='1'; pnpm --filter @surebet/worker dev`)
+`Motor puro e testável` · `Worker idempotente` · `Fase 1 rodando com arbitragens reais detectadas`
 
-## Deploy no VPS (pm2)
+</div>
 
-1. `pnpm install && pnpm build`
-2. `cd apps/worker && pm2 start ecosystem.config.cjs`
-3. `.env` em `apps/worker/` é carregado pelo próprio app no boot (via
-   `process.loadEnvFile`) — funciona tanto com `pnpm dev` quanto com pm2,
-   já que ambos rodam com cwd em `apps/worker`. Alternativa: `pm2 set`
+---
 
-## Testes
+## 🎯 O que é
 
-`pnpm test` roda vitest em todos os pacotes.
+Uma **surebet** existe quando as cotações de casas diferentes para o mesmo evento, somadas
+em probabilidade implícita, dão **menos de 1** — nesse caso há uma distribuição de banca que
+retorna lucro qualquer que seja o resultado.
+
+Este projeto coleta odds de provedores autorizados, detecta essas oportunidades e mantém uma
+tabela de arbitragens vivas no Postgres.
+
+> [!WARNING]
+> Oportunidade matemática **não é garantia de lucro**. Odds mudam em segundos, mercados são
+> suspensos, casas aplicam limites e o arredondamento pode comer a margem inteira.
+> Verifique a legislação local e os termos de cada plataforma.
+
+## 🧮 Como a detecção funciona
+
+O motor (`packages/core`) é uma função pura: recebe odds normalizadas, devolve arbitragens.
+Sem I/O, sem banco, sem relógio — o que o torna trivialmente testável.
+
+```ts
+export function computeArbs(odds: NormalizedOdd[]): Arb[]
+```
+
+O fluxo é agrupar → validar forma → calcular margem:
+
+1. Agrupa por `eventId | market | linha`
+2. Confere se o grupo tem **exatamente** o conjunto de resultados esperado do mercado
+3. Soma as probabilidades implícitas (`1/odd`) do melhor preço de cada resultado
+4. Se a soma for `< 1`, é arbitragem — calcula a distribuição da banca
+
+O passo 2 é o que evita alarme falso. Cada mercado tem uma forma própria, e futebol tem empate:
+
+```ts
+case 'h2h':
+  return first.sportKey.startsWith('soccer')
+    ? new Set([first.homeTeam, first.awayTeam, 'Draw'])
+    : new Set([first.homeTeam, first.awayTeam]);
+```
+
+Mercado de forma desconhecida retorna `null` — o motor prefere **não detectar** a arriscar
+uma arbitragem falsa.
+
+## 🧩 A parte difícil: agrupar a linha certa
+
+Em handicap (`spreads`), a linha precisa ser **assinada em relação ao mandante**. Agrupar pelo
+valor absoluto parece funcionar e está errado:
+
+```ts
+case 'spreads':
+  // linha assinada relativa ao mandante: só linhas complementares (favorito
+  // e azarão do mesmo confronto) caem no mesmo grupo. Usar |point| juntava
+  // "Lakers -2.5" com "Celtics -2.5" (favoritos opostos) na mesma chave.
+  return odd.outcome === odd.homeTeam ? odd.point : -odd.point;
+```
+
+Com `|point|`, "Lakers -2.5" e "Celtics -2.5" — dois **favoritos opostos**, que nunca formam
+um par complementar — caíam na mesma chave e produziam arbitragem fantasma.
+
+## 🏗️ Arquitetura
+
+```
+The Odds API
+     │
+     ▼
+apps/worker ──► normalize.ts   traduz o payload do provedor no modelo interno
+     │          loop.ts        ciclo de coleta (RUN_ONCE para um único passe)
+     │          arb-sync.ts    reconcilia a tabela `arbs`: abre, atualiza e fecha
+     │          alert.ts       notificação das novas
+     ▼
+packages/core ──► computeArbs()   motor puro, sem I/O
+     │
+     ▼
+Supabase Postgres ──► sports · events · odds · arbs
+```
+
+O `arb-sync` é **reconciliador, não append-only**: a cada ciclo ele compara o que o motor
+devolveu com o que está aberto no banco, e fecha o que sumiu. Sem isso a tabela encheria de
+arbitragens mortas que a interface mostraria como vivas.
+
+Chave primária de `odds` é composta (`event_id, bookmaker, market, outcome, point`), então
+recoletar o mesmo ciclo é idempotente.
+
+## 📁 Estrutura
+
+```
+packages/core/          motor de arbitragem puro (computeArbs) + tipos
+apps/worker/            coleta no The Odds API, normalização, sync e alerta
+supabase/migrations/    schema: sports, events, odds, arbs
+docs/superpowers/       spec de design e plano da fase 1
+```
+
+## 🚀 Rodar local
+
+```bash
+pnpm install && pnpm build
+cp apps/worker/.env.example apps/worker/.env   # preencher
+RUN_ONCE=1 pnpm --filter @surebet/worker dev   # um único ciclo
+```
+
+No PowerShell:
+
+```powershell
+$env:RUN_ONCE='1'; pnpm --filter @surebet/worker dev
+```
+
+## 🧪 Testes
+
+```bash
+pnpm test
+```
+
+Vitest em todos os pacotes. O motor tem teste próprio com fixture real do provedor
+(`apps/worker/test/fixtures/odds-api-soccer.json`), então mudança de formato do payload
+quebra o teste em vez de quebrar a produção.
+
+## 🚢 Deploy (VPS + pm2)
+
+```bash
+pnpm install && pnpm build
+cd apps/worker && pm2 start ecosystem.config.cjs
+```
+
+O `.env` de `apps/worker/` é carregado pelo próprio app no boot (`process.loadEnvFile`),
+então funciona igual com `pnpm dev` e com pm2 — ambos rodam com cwd em `apps/worker`.
+
+## 🗺️ Estado
+
+- ✅ **Fase 1** — motor, worker, schema e sync em produção, com arbitragens reais detectadas
+- 🔜 **Fase 2** — API pública v1
+
+## 🧱 Stack
+
+`TypeScript` · `Node.js` · `pnpm workspace` · `Supabase / Postgres` · `Vitest` · `pm2`
