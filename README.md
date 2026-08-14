@@ -10,6 +10,7 @@
 <a href="#"><img width="155" src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat&logo=postgresql&logoColor=white" alt="PostgreSQL"></a>
 <a href="#"><img width="138" src="https://img.shields.io/badge/Supabase-3FCF8E?style=flat&logo=supabase&logoColor=white" alt="Supabase"></a>
 <a href="#"><img width="100" src="https://img.shields.io/badge/Vitest-6E9F18?style=flat&logo=vitest&logoColor=white" alt="Vitest"></a>
+<a href="https://github.com/cauelimsia/surebet-api/actions/workflows/ci.yml"><img width="150" src="https://img.shields.io/github/actions/workflow/status/cauelimsia/surebet-api/ci.yml?style=flat&logo=githubactions&logoColor=white&label=CI" alt="CI"></a>
 
 [Como detecta](#-como-a-detecção-funciona) · [A parte difícil](#-a-parte-difícil-agrupar-a-linha-certa) · [Arquitetura](#️-arquitetura) · [Rodar local](#-rodar-local)
 
